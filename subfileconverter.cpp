@@ -71,7 +71,7 @@ void SubFileConverter::convertFile(const QString &fileName)
 
     QTextStream out(&fileOut);
     out.setEncoding(QStringConverter::Utf8);
-    // out << readText.replace("è", "č").replace("È", "Č");
+    out << readText.replace("è", "č").replace("È", "Č");
 
     readText.remove(QRegularExpression(QStringLiteral(R"(\{\\*an\d+\})")));        // remove {anX}
     readText.remove(QRegularExpression(QStringLiteral("[\\uFEFF\\u200B\\u200C\\u200D\\u202F]"))); // invisible chars
