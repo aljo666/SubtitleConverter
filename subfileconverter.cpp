@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QStringConverter>
 #include <QTextCodec>
+#include <QRegularExpression>
 #include <QDebug>
 
 SubFileConverter::SubFileConverter(QObject *parent)
@@ -39,16 +40,16 @@ void SubFileConverter::convertFile(const QString &fileName)
 
     QTextStream in(&fileIn);
     in.setEncoding(QStringConverter::Utf8);
+    QByteArray bfileIna = fileIn.readAll();
+    bfileIna.replace("\xEF\xBB\xBF", "");
 
-    QString readText = in.readAll();
+    QString readText = bfileIna;
     if (!readText.contains("ž")) {
         // qDebug() << readText;
         fileIn.seek(0); // Go back to the beginning of the file
-        // in.setEncoding(QStringEncoder::Latin1);
-        // auto fromUtf16 = QStringEncoder(QStringEncoder::Utf8);
-        // readText = fromUtf16(in.readAll());
 
-        QByteArray bfileIna = fileIn.readAll();
+        bfileIna = fileIn.readAll();
+        bfileIna.replace("\xEF\xBB\xBF", "");
 
         QTextCodec* codec = QTextCodec::codecForName("windows-1252");
         readText = codec->toUnicode(bfileIna);
@@ -61,14 +62,25 @@ void SubFileConverter::convertFile(const QString &fileName)
 
     // Create a new file
     QFile fileOut(fileNameOut);
-    if (!fileOut.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    if (!fileOut.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         qWarning() << "Could not create file:" << fileNameOut << fileOut.errorString();
         return;
     }
 
+    fileOut.write("\xEF\xBB\xBF", 3); // BOM
+
     QTextStream out(&fileOut);
     out.setEncoding(QStringConverter::Utf8);
-    out << readText.replace("è", "č").replace("È", "Č");
+    // out << readText.replace("è", "č").replace("È", "Č");
+
+    readText.remove(QRegularExpression(QStringLiteral(R"(\{\\*an\d+\})")));        // remove {anX}
+    readText.remove(QRegularExpression(QStringLiteral("[\\uFEFF\\u200B\\u200C\\u200D\\u202F]"))); // invisible chars
+    // normalize EOL
+    readText.replace("\r\n", "\n");
+    readText.replace('\r', '\n');
+    readText.replace("\n", "\r\n");
+
+    out << readText;
 
     // optional, as QFile destructor will already do it:
     fileOut.close();
